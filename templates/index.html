@@ -1,0 +1,44 @@
+<!doctype html>
+<title>Person Re-Identification - Khanh Phan</title>
+<h2>Person Re-Identification - Khanh Phan</h2>
+<p>Please select and upload at least 2 videos.</p>
+
+<form method="post" action="/" enctype="multipart/form-data">
+    <dl>
+        <p>
+            <input type="file" name="video_files" autocomplete="off" multiple="" required>
+        </p>
+    </dl>
+    <p>
+        <input type="submit" value="Upload and analyze ...">
+    </p>
+</form>
+
+<p>
+	{% with messages = get_flashed_messages(category_filter=["video"]) %}
+	{% if messages %}
+		<ul>
+		{% for message in messages %}
+		<li>{{ message }}</li>
+		{% endfor %}
+		</ul>
+	{% endif %}
+	{% endwith %}
+</p>
+
+{% if filename %}
+	<div style="margin: 10px auto;">
+		<img src="{{ url_for('process_video') }}" class="rounded" alt="loading...." id="video_feed">
+	</div>
+	{% with download_msgs = get_flashed_messages(category_filter=["download"]) %}
+	{% if download_msgs %}
+		{% for download_msg in download_msgs %}
+		{{ download_msg }}
+		{% endfor %}
+	{% endif %}
+	{% endwith %}
+	<div class="row">
+		<a class="btn btn-success" href="{{url_for('download_file')}}">Download</a>
+	</div>
+
+{% endif %}

@@ -1,0 +1,6 @@
+openvino-dev[ONNX,tensorflow2,pytorch]==2022.2.0
+scipy
+Flask
+opencv-python
+munkres
+common/python
