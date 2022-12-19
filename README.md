@@ -2,14 +2,11 @@
 
 - [Person Re-identification](#person-re-identification-with-openvino)
   - [Intro](#Intro)
-  - [Reference](#reference)
-    - [OpenVINO Toolkit and Flask Video streaming](#openvino-toolkit-and-flask-video-streaming)
-    - [OpenVINO Intel Model](#openvino-intel-model)
   - [Tested Environment](#tested-environment)
-  - [Models](#models)
   - [Required Python packages](#required-python-packages)
   - [How to use](#how-to-use)
   - [Run app](#run-app)
+  - [Output](#output)
 
 <!-- /TOC -->
 
