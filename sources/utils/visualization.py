@@ -46,8 +46,8 @@ def draw_detections(frame, detections, show_all_detections=True):
             label_size, base_line = cv.getTextSize(
                 label,
                 cv.FONT_HERSHEY_SIMPLEX,
+                0.4,
                 1,
-                2,
             )
             top = max(top, label_size[1])
             cv.rectangle(
@@ -62,9 +62,9 @@ def draw_detections(frame, detections, show_all_detections=True):
                 label,
                 (left, top),
                 cv.FONT_HERSHEY_SIMPLEX,
-                1,
+                0.4,
                 (0, 0, 0),
-                2,
+                1,
             )
 
 

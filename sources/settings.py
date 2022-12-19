@@ -22,3 +22,5 @@ DEVICE_KINDS = ["CPU", "GPU", "MYRIAD", "HETERO", "HDDL"]
 # Directory
 UPLOAD_FOLDER = "static/uploads/"
 DOWNLOAD_FOLDER = "static/results/"
+
+SECRET_KEY = "secret key"

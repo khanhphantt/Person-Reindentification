@@ -28,7 +28,7 @@ def build_argparser():
         "--input",
         # required=True,
         nargs="+",
-        help="Required. Paths to video files",
+        help="Paths to video files",
     )
 
     parser.add_argument(
@@ -43,12 +43,12 @@ def build_argparser():
         "--m_reid",
         default="models/person-reidentification-retail-0288/FP16/person-reidentification-retail-0288.xml",  # noqa: E501
         type=str,
-        help="Required. Path to the object re-identification model",
+        help="Path to the object re-identification model",
     )
     parser.add_argument(
         "--config",
         type=str,
-        default=os.path.join(ROOT_DIR, "configs/person.py"),
+        default=os.path.join(ROOT_DIR, "sources/configs/person.py"),
         required=False,
         help="Configuration file",
     )

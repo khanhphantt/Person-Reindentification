@@ -30,6 +30,7 @@ from flask import (
 from openvino.runtime import Core
 from werkzeug.utils import secure_filename
 
+from sources.args import build_argparser
 from sources.mc_tracker.mct import MultiCameraTracker
 from sources.settings import (
     DOWNLOAD_FOLDER,
@@ -37,7 +38,6 @@ from sources.settings import (
     UPLOAD_FOLDER,
 )
 from sources.thread import FramesThreadBody
-from sources.utils.args import build_argparser
 from sources.utils.misc import (
     check_pressed_keys,
     read_py_config,
