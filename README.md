@@ -1,7 +1,7 @@
 <!-- TOC -->
 
 - [Person Re-identification](#person-re-identification-with-openvino)
-  - [What's this](#whats-this)
+  - [Intro](#Intro)
   - [Reference](#reference)
     - [OpenVINO Toolkit and Flask Video streaming](#openvino-toolkit-and-flask-video-streaming)
     - [OpenVINO Intel Model](#openvino-intel-model)
@@ -15,7 +15,7 @@
 
 # Person Re-identification
 
-## What's this
+## Intro
 
 A Person Identification using 2 models from Intel OpenVINO[^1]:
 
@@ -86,5 +86,9 @@ Access the url below on your browser
 ```txt
 http://127.0.0.1:5000/
 ```
+<img src="https://github.com/khanhphantt/Person-Reindentification/blob/main/demo/demo.gif" alt="mall2" width="%" height="auto">
 
-The log (app.log) is output to the current directory.
+
+## Output
+**<a href="https://github.com/khanhphantt/Person-Reindentification/blob/main/static/results/ml-program-test-c0%20ml-program-test-c1%20.mp4">
+Sample Output Video</a>
