@@ -86,9 +86,10 @@ Access the url below on your browser
 ```txt
 http://127.0.0.1:5000/
 ```
+Illustration in gif:
 <img src="https://github.com/khanhphantt/Person-Reindentification/blob/main/demo/demo.gif" alt="mall2" width="%" height="auto">
 
 
 ## Output
-**<a href="https://github.com/khanhphantt/Person-Reindentification/blob/main/static/results/ml-program-test-c0%20ml-program-test-c1%20.mp4">
+<a href="https://github.com/khanhphantt/Person-Reindentification/blob/main/static/results/ml-program-test-c0%20ml-program-test-c1%20.mp4">
 Sample Output Video</a>
