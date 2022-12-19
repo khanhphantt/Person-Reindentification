@@ -18,3 +18,7 @@ sys.path.append(os.path.join(ROOT_DIR, "common/python"))
 
 # List of devices can be used for training/recognizing/detection
 DEVICE_KINDS = ["CPU", "GPU", "MYRIAD", "HETERO", "HDDL"]
+
+# Directory
+UPLOAD_FOLDER = "static/uploads/"
+DOWNLOAD_FOLDER = "static/results/"

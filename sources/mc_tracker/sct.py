@@ -23,8 +23,8 @@ from scipy.spatial.distance import (
     cosine,
 )
 
-from utils.analyzer import Analyzer
-from utils.misc import AverageEstimator
+from sources.utils.analyzer import Analyzer
+from sources.utils.misc import AverageEstimator
 
 THE_BIGGEST_DISTANCE = 10.0
 

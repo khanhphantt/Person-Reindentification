@@ -9,177 +9,286 @@ __version__     = "2.0"
 __email__       = "khanhpm@gmail.com"
 """
 
-import configparser
-import json
+import logging as log
 import os
+import queue
 import sys
-from logging import (
-    DEBUG,
-    basicConfig,
-    getLogger,
-)
+from datetime import date
+from logging import getLogger
+from threading import Thread
 
 import cv2
 from flask import (
     Flask,
     Response,
-    jsonify,
+    flash,
+    redirect,
     render_template,
     request,
+    send_file,
 )
-from source.args import build_argparser
-from source.camera import VideoCamera
-from source.interactive_detection import Detections
+from openvino.runtime import Core
+from werkzeug.utils import secure_filename
 
+from sources.mc_tracker.mct import MultiCameraTracker
+from sources.settings import (
+    DOWNLOAD_FOLDER,
+    SECRET_KEY,
+    UPLOAD_FOLDER,
+)
+from sources.thread import FramesThreadBody
+from sources.utils.args import build_argparser
+from sources.utils.misc import (
+    check_pressed_keys,
+    read_py_config,
+)
+from sources.utils.network_wrappers import (
+    Detector,
+    VectorCNN,
+)
+from sources.utils.video import (
+    MulticamCapture,
+    NormalizerCLAHE,
+)
+from sources.utils.visualization import (
+    get_target_size,
+    visualize_multicam_detections,
+)
+
+# TODO: add to settings
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["DOWNLOAD_FOLDER"] = DOWNLOAD_FOLDER
 logger = getLogger(__name__)
 
-config = configparser.ConfigParser()
-config.read("config.ini")
+log.basicConfig(
+    format="[ %(levelname)s ] %(message)s",
+    level=log.DEBUG,
+    stream=sys.stdout,
+)
 
 
-# detection control flag
-is_async = eval(config.get("DEFAULT", "is_async"))
-is_det = eval(config.get("DEFAULT", "is_det"))
-is_reid = eval(config.get("DEFAULT", "is_reid"))
-show_track = eval(config.get("TRACKER", "show_track"))
+def run(params, config, capture, detector, reid):
+    win_name = "Multi camera tracking"
+    frame_number = 0
+    key = -1
 
-# 0:x-axis 1:y-axis -1:both axis
-flip_code = eval(config.get("DEFAULT", "flip_code"))
-resize_width = int(config.get("CAMERA", "resize_width"))
-
-
-def gen(camera):
-    frame_id = 0
-    while True:
-        frame_id += 1
-        frame = camera.get_frame(flip_code)
-
-        if frame is None:
-            logger.info("video finished. exit...")
-            os._exit(0)
-        frame = detections.person_detection(
-            frame,
-            is_async,
-            is_det,
-            is_reid,
-            str(frame_id),
-            show_track,
+    if config.normalizer_config.enabled:
+        capture.add_transform(
+            NormalizerCLAHE(
+                config.normalizer_config.clip_limit,
+                config.normalizer_config.tile_size,
+            ),
         )
-        ret, jpeg = cv2.imencode(".jpg", frame)
+
+    tracker = MultiCameraTracker(
+        capture.get_num_sources(),
+        reid,
+        config.sct_config,
+        **vars(config.mct_config),
+        visual_analyze=config.analyzer,
+    )
+
+    global thread_body
+
+    thread_body = FramesThreadBody(
+        capture,
+        max_queue_length=len(capture.captures) * 2,
+    )
+    frames_thread = Thread(target=thread_body)
+    frames_thread.start()
+
+    frames_read = False
+
+    prev_frames = thread_body.frames_queue.get()
+    detector.run_async(prev_frames, frame_number)
+
+    while thread_body.process:
+        if not params.no_show:
+            key = check_pressed_keys(key)
+            if key == 27:
+                break
+        try:
+            frames = thread_body.frames_queue.get_nowait()
+            frames_read = True
+        except queue.Empty:
+            frames = None
+
+        if frames is None:
+            continue
+
+        all_detections = detector.wait_and_grab()
+        frame_number += 1
+        detector.run_async(frames, frame_number)
+
+        all_masks = [[] for _ in range(len(all_detections))]
+        for i, detections in enumerate(all_detections):
+            all_detections[i] = [det[0] for det in detections]
+            all_masks[i] = [det[2] for det in detections if len(det) == 3]
+
+        tracker.process(prev_frames, all_detections, all_masks)
+        tracked_objects = tracker.get_tracked_objects()
+
+        vis = visualize_multicam_detections(
+            prev_frames, tracked_objects, **vars(config.visualization_config)
+        )
+
+        if not params.no_show:
+            cv2.imshow(win_name, vis)
+
+        if frames_read:
+            if len(params.output_video):
+                frame_size = [frame.shape[::-1] for frame in frames]
+                fps = capture.get_fps()
+                target_width, target_height = get_target_size(
+                    frame_size, None, **vars(config.visualization_config)
+                )
+                video_output_size = (target_width, target_height)
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                output_video = cv2.VideoWriter(
+                    params.output_video,
+                    fourcc,
+                    min(fps),
+                    video_output_size,
+                )
+            else:
+                output_video = None
+        if output_video:
+            output_video.write(cv2.resize(vis, video_output_size))
+
+        prev_frames, frames = frames, prev_frames
+
+        frame = frames[0]
+        for id in range(1, len(frames)):
+            frame = cv2.hconcat([frame, frames[id]])
+        _, jpeg = cv2.imencode(".jpg", frame)
         frame = jpeg.tobytes()
         yield (
             b"--frame\r\n"
             b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n\r\n"
         )
 
+    thread_body.process = False
+    frames_thread.join()
+
+
+def check_file(filename):
+    # Validation process
+    if filename == "" and filename.endswith((".mp4", ".avi")):
+        return True
+
 
 @app.route("/")
 def index():
     return render_template(
         "index.html",
-        is_async=is_async,
-        flip_code=flip_code,
         enumerate=enumerate,
     )
 
 
-@app.route("/video_feed")
-def video_feed():
+@app.route("/", methods=["POST"])
+def upload_video():
+    global capture
+    global output_name
+
+    if "video_files" not in request.files:
+        flash("No file is selected. Please choose 2 videos or more")
+        return redirect(request.url)
+
+    uploaded_files = request.files.getlist("video_files")
+    prefix = f"{date.today()}"
+    original_file = ""
+    original_file_wo_ext = ""
+    data = []
+
+    if len(uploaded_files) < 2:
+        flash("Please choose 2 videos or more")
+
+    for file in uploaded_files:
+        if check_file(file.filename) is False:
+            flash(
+                f"File type is not allowed: {file}. Please select mp4 files.",
+            )  # noqa: E501
+            return redirect(request.url)
+
+        filename = secure_filename(file.filename)
+        original_file += f'"{filename}"' + " "
+        original_file_wo_ext += f"{os.path.splitext(filename)[0]}" + " "
+        filename = f"{prefix}-{filename}"
+        saved_url = os.path.join(
+            app.config["UPLOAD_FOLDER"],
+            filename,
+        )
+        file.save(saved_url)
+        data.append(saved_url)
+    flash(f"Analyze {len(uploaded_files)} videos: {original_file}", "video")
+    flash(
+        "The output video will be available for downloading when the processing is done.",  # noqa: E501
+        "download",
+    )
+    args.input = data
+    output_name = original_file_wo_ext + ".mp4"
+    args.output_video = os.path.join(
+        app.config["DOWNLOAD_FOLDER"],
+        output_name,
+    )
+
+    capture = MulticamCapture(args.input, args.loop)
+    object_detector.max_num_frames = capture.get_num_sources()
+    return render_template("index.html", filename=uploaded_files)
+
+
+@app.route("/process_video")
+def process_video():
     return Response(
-        gen(camera),
+        run(args, config, capture, object_detector, object_recognizer),
         mimetype="multipart/x-mixed-replace; boundary=frame",
     )
 
 
-@app.route("/detection", methods=["POST"])
-def detection():
-    global is_async
-    global is_det
-    global is_reid
-    global show_track
+@app.route("/download_file", methods=["GET"])
+def download_file():
+    try:
+        if thread_body.process is True:
+            flash(
+                "Processing has not done yet. Please try again later",
+                "download",
+            )  # noqa: E501
+            filename = True
+            return render_template("index.html", filename=filename)
+        path = os.path.join(
+            app.config["DOWNLOAD_FOLDER"],
+            output_name,
+        )
+        # return send_from_directory(directory=path, filename=output_name)
+        return send_file(path, as_attachment=True)
 
-    command = request.json["command"]
-    if command == "async":
-        is_async = True
-    elif command == "sync":
-        is_async = False
-
-    if command == "person_det":
-        is_det = not is_det
-        is_reid = False
-    if command == "person_reid":
-        is_det = False
-        is_reid = not is_reid
-    if command == "show_track":
-        show_track = not show_track
-
-    result = {
-        "command": command,
-        "is_async": is_async,
-        "flip_code": flip_code,
-        "is_det": is_det,
-        "is_reid": is_reid,
-        "show_track": show_track,
-    }
-    logger.info(
-        f"command:{command} is_async:{is_async} flip_code:{flip_code} is_det:{is_det} is_reid:{is_reid} show_track:{show_track}",  # noqa: E501
-    )
-
-    return jsonify(ResultSet=json.dumps(result))
-
-
-@app.route("/flip", methods=["POST"])
-def flip_frame():
-    global flip_code
-
-    command = request.json["command"]
-
-    if command == "flip" and flip_code is None:
-        flip_code = 0
-    elif command == "flip" and flip_code == 0:
-        flip_code = 1
-    elif command == "flip" and flip_code == 1:
-        flip_code = -1
-    elif command == "flip" and flip_code == -1:
-        flip_code = None
-
-    result = {
-        "command": command,
-        "is_async": is_async,
-        "flip_code": flip_code,
-        "is_det": is_det,
-        "is_reid": {is_reid},
-    }
-    return jsonify(ResultSet=json.dumps(result))
+    except Exception as e:
+        return str(e)
 
 
 if __name__ == "__main__":
-
     # arg parse
     args = build_argparser().parse_args()
-    devices = [args.d_pd, args.d_reid]
 
-    # logging
-    # level = INFO
-    # if args.verbose:
-    level = DEBUG
-
-    basicConfig(
-        filename="app.log",
-        filemode="w",
-        level=level,
-        format="%(asctime)s %(levelname)s %(name)s %(funcName)s:%(lineno)d %(message)s",  # noqa: E501
-    )
-
-    if 0 < args.grid < 3:
-        print("\nargument grid must be grater than 3")
+    if len(args.config):
+        log.debug(f"Reading config from {args.config}")
+        config = read_py_config(args.config)
+    else:
+        log.error(
+            "No configuration file specified. Please specify parameter '--config'",  # noqa: E501
+        )
         sys.exit(1)
 
-    camera = VideoCamera([args.input, args.input2], resize_width)
-    logger.info(
-        f"input:{args.input} input2:{args.input2} frame shape: {camera.frame.shape} grid:{args.grid}",  # noqa: E501
+    core = Core()
+    object_detector = Detector(
+        core,
+        args.m_detector,
+        config.obj_det.trg_classes,
+        args.t_detector,
+        args.device,
     )
-    detections = Detections(camera.frame, devices, args.grid)
 
+    object_recognizer = VectorCNN(core, args.m_reid, args.device)
     app.run(host="0.0.0.0", threaded=True)

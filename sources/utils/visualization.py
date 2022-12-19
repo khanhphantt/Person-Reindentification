@@ -17,7 +17,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils.misc import COLOR_PALETTE
+from sources.utils.misc import COLOR_PALETTE
 
 
 def draw_detections(frame, detections, show_all_detections=True):

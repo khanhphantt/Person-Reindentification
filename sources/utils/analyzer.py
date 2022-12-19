@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from utils.visualization import plot_timeline
+from sources.utils.visualization import plot_timeline
 
 # from tensorboardX import SummaryWriter
 

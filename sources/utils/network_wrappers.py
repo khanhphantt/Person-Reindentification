@@ -22,7 +22,7 @@ from types import SimpleNamespace as namespace
 import cv2
 import numpy as np
 
-from utils.ie_tools import IEModel
+from sources.utils.ie_tools import IEModel
 
 from .segm_postprocess import postprocess
 

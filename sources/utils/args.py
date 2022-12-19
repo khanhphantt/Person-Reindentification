@@ -14,7 +14,7 @@ __email__       = "khanhpm@gmail.com"
 import os
 from argparse import ArgumentParser
 
-from utils.settings import (
+from sources.settings import (
     DEVICE_KINDS,
     ROOT_DIR,
 )
