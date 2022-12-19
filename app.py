@@ -70,7 +70,7 @@ log.basicConfig(
 
 
 def run(params, config, capture, detector, reid):
-    win_name = "Multi camera tracking"
+    win_name = "person reidentification"
     frame_number = 0
     key = -1
 
@@ -99,19 +99,36 @@ def run(params, config, capture, detector, reid):
     frames_thread = Thread(target=thread_body)
     frames_thread.start()
 
-    frames_read = False
-
     prev_frames = thread_body.frames_queue.get()
     detector.run_async(prev_frames, frame_number)
+    if len(params.output_video):
+        frame_size = [frame.shape[::-1] for frame in prev_frames]
+        fps = capture.get_fps()
+        target_width, target_height = get_target_size(
+            frame_size,
+            None,
+            **vars(config.visualization_config),
+        )
+
+        video_output_size = (target_width, target_height)
+        logger.info(f"video_output_size={video_output_size} - {frame_size}")
+        output_video = cv2.VideoWriter(
+            params.output_video,
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            min(fps),
+            video_output_size,
+        )
+    else:
+        output_video = None
 
     while thread_body.process:
-        if not params.no_show:
+        if params.show:
             key = check_pressed_keys(key)
             if key == 27:
                 break
         try:
             frames = thread_body.frames_queue.get_nowait()
-            frames_read = True
+
         except queue.Empty:
             frames = None
 
@@ -134,26 +151,9 @@ def run(params, config, capture, detector, reid):
             prev_frames, tracked_objects, **vars(config.visualization_config)
         )
 
-        if not params.no_show:
+        if params.show:
             cv2.imshow(win_name, vis)
 
-        if frames_read:
-            if len(params.output_video):
-                frame_size = [frame.shape[::-1] for frame in frames]
-                fps = capture.get_fps()
-                target_width, target_height = get_target_size(
-                    frame_size, None, **vars(config.visualization_config)
-                )
-                video_output_size = (target_width, target_height)
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                output_video = cv2.VideoWriter(
-                    params.output_video,
-                    fourcc,
-                    min(fps),
-                    video_output_size,
-                )
-            else:
-                output_video = None
         if output_video:
             output_video.write(cv2.resize(vis, video_output_size))
 
@@ -169,6 +169,7 @@ def run(params, config, capture, detector, reid):
             b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n\r\n"
         )
 
+    logger.info("Finish process!")
     thread_body.process = False
     frames_thread.join()
 

@@ -61,7 +61,7 @@ optional arguments:
                         Threshold for the object detection model
   -d {CPU,GPU,MYRIAD,HETERO,HDDL}, --device {CPU,GPU,MYRIAD,HETERO,HDDL}
                         Optional. Target device. Default value is CPU.
-  --no_show             Optional. Don\'t show output
+  --show             Optional. Show output in real time
   --output_video OUTPUT_VIDEO
                         Optional. Path to output video
 ```

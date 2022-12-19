@@ -72,7 +72,7 @@ def get_target_size(
     frame_sizes,
     vis=None,
     max_window_size=(1920, 1080),
-    stack_frames="vertical",
+    stack_frames="horizontal",
     **kwargs,
 ):
     if vis is None:
@@ -81,14 +81,15 @@ def get_target_size(
         for size in frame_sizes:
             if width > 0 and height > 0:
                 if stack_frames == "vertical":
-                    height += size[1]
+                    height += size[2]
                 elif stack_frames == "horizontal":
-                    width += size[0]
+                    width += size[1]
             else:
                 width, height = size[1:]
     else:
         height, width = vis.shape[:2]
 
+    """
     if stack_frames == "vertical":
         target_height = max_window_size[1]
         target_ratio = target_height / height
@@ -97,6 +98,8 @@ def get_target_size(
         target_width = max_window_size[0]
         target_ratio = target_width / width
         target_height = int(height * target_ratio)
+    """
+    target_width, target_height = width, height
     return target_width, target_height
 
 

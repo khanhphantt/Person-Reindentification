@@ -41,7 +41,7 @@ normalizer_config = namespace(
 visualization_config = namespace(
     show_all_detections=True,
     max_window_size=(1920, 1080),
-    stack_frames="vertical",
+    stack_frames="horizontal",
 )
 
 analyzer = namespace(

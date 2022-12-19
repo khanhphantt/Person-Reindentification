@@ -74,7 +74,7 @@ def build_argparser():
     )
 
     parser.add_argument(
-        "--no_show",
+        "--show",
         help="Optional. Don't show output",
         action="store_true",
     )
